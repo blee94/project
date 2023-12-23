@@ -1,26 +1,17 @@
 import '../styles/chat.css';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Chat from './Chat';
 import Notice from './Notice';
 import io from 'socket.io-client';
 
 const socket = io.connect('http://localhost:8000', { autoConnect: false });
-export default function Chatting1() {
+export default function Chatting() {
   const [msgInput, setMsgInput] = useState('');
-  const [chatList, setChatList] = useState([
-    {
-      type: 'my',
-      content: '안녕?',
-    },
-    {
-      type: 'other',
-      content: '응 안녕?',
-    },
-    {
-      type: 'notice',
-      content: '~~~~~~님이 입장하셨습니다.',
-    },
-  ]);
+  const [userIdInput, setUserIdInput] = useState('');
+  const [chatList, setChatList] = useState([]);
+  const [userId, setUserId] = useState(null);
+  const [userList, setUserList] = useState({});
+  const [dmTo, setDmTo] = useState('all');
 
   const initSocketConnect = () => {
     console.log('connected', socket.connected);
@@ -28,30 +19,50 @@ export default function Chatting1() {
   };
 
   useEffect(() => {
-    initSocketConnect();
+    socket.on('error', (res) => {
+      alert(res.msg);
+    });
 
-    // [이슈 1] mount 시에만 한 번 읽고 말아요.
-    // newChatList를 만들 때, mount 시점에 chatList만 이용하게 된다.
-    // socket.on("notice", (res) => {
-    //   const newChatList = [...chatList, { type: "notice", content: res.msg }];
-    //   setChatList(newChatList);
-    // });
+    socket.on('entrySuccess', (res) => {
+      setUserId(res.userId);
+    });
+
+    socket.on('userList', (res) => {
+      setUserList(res);
+    });
   }, []);
 
+  const userListOptions = useMemo(() => {
+    const options = [];
+    for (const key in userList) {
+      if (userList[key] === userId) continue;
+      options.push(
+        <option key={key} value={key}>
+          {userList[key]}
+        </option>
+      );
+    }
+    return options;
+  }, [userList]);
+
+  const addChatList = useCallback(
+    (res) => {
+      const type = res.userId === userId ? 'my' : 'other';
+      const content = `${res.dm ? '(귓속말) ' : ''} ${res.userId}: ${res.msg}`;
+      const newChatList = [...chatList, { type: type, content: content }];
+      setChatList(newChatList);
+    },
+    [userId, chatList]
+  );
+
   useEffect(() => {
-    // [해결 1] chatList가 변경될 때마다 event를 다시 만들도록 함.
-    // [이슈 2] notice이벤트가 chatList가 변경될 때마다 누적됨.
-    // socket.on("notice", (res) => {
-    //   console.log("notice");
-    //   const newChatList = [...chatList, { type: "notice", content: res.msg }];
-    //   setChatList(newChatList);
-    // });
+    socket.on('chat', addChatList);
+    return () => socket.off('chat', addChatList);
+  }, [addChatList]);
 
-    // [해결 2] return 이용해 notice 이벤트를 제거 후, 다시 생성할 수 이도록 함.
+  useEffect(() => {
     const notice = (res) => {
-      // console.log("notice");
       const newChatList = [...chatList, { type: 'notice', content: res.msg }];
-
       setChatList(newChatList);
     };
 
@@ -59,25 +70,67 @@ export default function Chatting1() {
     return () => socket.off('notice', notice);
   }, [chatList]);
 
-  const sendMsg = () => {};
+  const sendMsg = () => {
+    if (msgInput !== '') {
+      socket.emit('sendMsg', { userId: userId, msg: msgInput, dm: dmTo });
+      setMsgInput('');
+    }
+  };
+
+  const entryChat = () => {
+    initSocketConnect();
+    socket.emit('entry', { userId: userIdInput });
+  };
   return (
     <>
-      <h3>실습 2, 3번</h3>
-      <div className='chat-container'>
-        {chatList.map((chat, i) => {
-          if (chat.type === 'notice') return <Notice key={i} chat={chat} />;
-          else return <Chat key={i} chat={chat} />;
-        })}
-      </div>
-
-      <div className='input-container'>
-        <input
-          type='text'
-          value={msgInput}
-          onChange={(e) => setMsgInput(e.target.value)}
-        />
-        <button onClick={sendMsg}>전송</button>
-      </div>
+      {userId ? (
+        <>
+          <div className='chat-container'>
+            <div className='userList'>
+              <svg
+                xmlns='http://www.w3.org/2000/svg'
+                width='16'
+                height='16'
+                fill='currentColor'
+                class='bi bi-list'
+                viewBox='0 0 16 16'
+              >
+                <path
+                  fill-rule='evenodd'
+                  d='M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5zm0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5z'
+                />
+              </svg>
+            </div>
+            {chatList.map((chat, i) => {
+              if (chat.type === 'notice') return <Notice key={i} chat={chat} />;
+              else return <Chat key={i} chat={chat} />;
+            })}
+            <div className='input-container'>
+              <select value={dmTo} onChange={(e) => setDmTo(e.target.value)}>
+                <option value='all'>전체</option>
+                {userListOptions}
+              </select>
+              <input
+                type='text'
+                value={msgInput}
+                onChange={(e) => setMsgInput(e.target.value)}
+              />
+              <button onClick={sendMsg}>전송</button>
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className='input-container'>
+            <input
+              type='text'
+              value={userIdInput}
+              onChange={(e) => setUserIdInput(e.target.value)}
+            />
+            <button onClick={entryChat}>입장</button>
+          </div>
+        </>
+      )}
     </>
   );
 }

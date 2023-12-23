@@ -3,6 +3,13 @@
   min-height: 500px;
   background-color: rgb(203, 191, 255);
   padding: 10px 15px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.userList {
+  position: relative;
+  left: 300px;
 }
 
 .chat-container .list {

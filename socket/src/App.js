@@ -1,12 +1,10 @@
 import './App.css';
-import Chatting1 from './components/Chatting';
-import Chatting3 from './components/Chatting3';
+import Chatting from './components/Chatting';
 
 function App() {
   return (
     <div>
-      <Chatting1 />
-      <Chatting3 />
+      <Chatting />
     </div>
   );
 }
