@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>socket</title>
+    <script src="/socket.io/socket.io.js"></script>
+  </head>
+  <body>
+    <h3> 소켓 연습 </h3>
+    <button onclick="hello()">버튼</button>
+
+    <button onclick="entry()">입장</button>
+
+    <script>
+      const socket = io()
+
+
+      function hello() {
+
+        //   (전송할 이벤트 이름, [전송할 데이터])
+        // 전송할 데이터는 형태는 자유롭게
+        socket.emit('hello', {
+          msg: '안녕'
+        })
+      }
+
+      function entry() {
+        socket.emit('entry')
+      }
+
+      //  server에서 emit으로 보낸 데이터. on으로 받기
+      socket.on('bye', (res) => {
+        console.log(res)
+      })
+
+      socket.on('notice', (res) => {
+        console.log(res.msg)
+      })
+    </script>
+  </body>
+</html>
